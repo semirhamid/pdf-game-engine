@@ -57,3 +57,19 @@ export function formatString(s: string): string {
   for (let i = 0; i < s.length; i++) hex += s.charCodeAt(i).toString(16).padStart(4, '0');
   return `<${hex}>`;
 }
+
+export function serialize(v: PdfValue): string {
+  if (v === null) return 'null';
+  if (v instanceof Name) return escapeName(v.name);
+  if (v instanceof Ref) return `${v.num} 0 R`;
+  if (v instanceof Raw) return v.text;
+  if (typeof v === 'number') return formatNumber(v);
+  if (typeof v === 'boolean') return String(v);
+  if (typeof v === 'string') return formatString(v);
+  if (Array.isArray(v)) return `[${v.map(serialize).join(' ')}]`;
+  const parts: string[] = [];
+  for (const [k, val] of Object.entries(v)) {
+    if (val !== undefined) parts.push(`${escapeName(k)} ${serialize(val)}`);
+  }
+  return `<< ${parts.join(' ')} >>`;
+}
