@@ -86,3 +86,29 @@ export interface GameState {
   visible: boolean[];
   events: GameEvent[];
 }
+
+// up, right, down, left
+export const DIRECTIONS: Point[] = [
+  { x: 0, y: -1 },
+  { x: 1, y: 0 },
+  { x: 0, y: 1 },
+  { x: -1, y: 0 },
+];
+
+export function at(x: number, y: number): number {
+  return y * WIDTH + x;
+}
+
+export function inBounds(x: number, y: number): boolean {
+  return x >= 0 && y >= 0 && x < WIDTH && y < HEIGHT;
+}
+
+export function distance(a: Point, b: Point): number {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
+export function filled<T>(value: T): T[] {
+  const cells: T[] = [];
+  for (let i = 0; i < WIDTH * HEIGHT; i++) cells.push(value);
+  return cells;
+}
