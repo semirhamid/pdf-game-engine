@@ -77,3 +77,194 @@ export function decodePng(png: Buffer): Image {
   for (let i = 0; i < width * height; i++) px.copy(data, i * 3, i * channels, i * channels + 3);
   return { width, height, data, png };
 }
+
+export class Chrome {
+  private seq = 0;
+  private readonly pending = new Map<
+    number,
+    { resolve: (v: any) => void; reject: (e: Error) => void }
+  >();
+  private proc!: ChildProcess;
+  private ws!: WebSocket;
+  private server!: Server;
+  private profile!: string;
+  private sessionId = '';
+  version = '';
+
+  static async open(
+    pdfPath: string,
+    opts: { width?: number; height?: number; headless?: boolean; scale?: number } = {},
+  ): Promise<Chrome> {
+    const bin = findChrome();
+    if (!bin) throw new Error('Chrome not found (set CHROME_PATH)');
+    const c = new Chrome();
+    const width = opts.width ?? 1280;
+    const height = opts.height ?? 800;
+
+    c.server = createServer((_req, res) => {
+      res.writeHead(200, { 'content-type': 'application/pdf', 'cache-control': 'no-store' });
+      res.end(readFileSync(pdfPath));
+    });
+    await new Promise<void>((r) => c.server.listen(0, '127.0.0.1', r));
+    const port = (c.server.address() as { port: number }).port;
+
+    c.profile = mkdtempSync(join(tmpdir(), 'pdf-dungeon-chrome-'));
+    c.proc = spawn(
+      bin,
+      [
+        ...((opts.headless ?? !process.env['HEADFUL']) === false ? [] : ['--headless=new']),
+        '--remote-debugging-port=0',
+        `--user-data-dir=${c.profile}`,
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--disable-background-networking',
+        `--window-size=${width},${height}`,
+        `--force-device-scale-factor=${opts.scale ?? 1}`,
+        ...(process.env['CI'] ? ['--no-sandbox'] : []),
+        'about:blank',
+      ],
+      { stdio: ['ignore', 'ignore', 'pipe'] },
+    );
+
+    const wsUrl = await new Promise<string>((resolve, reject) => {
+      let err = '';
+      const t = setTimeout(() => reject(new Error('Chrome did not start:\n' + err)), 20000);
+      c.proc.stderr!.on('data', (d) => {
+        err += d;
+        const m = /DevTools listening on (ws:\S+)/.exec(err);
+        if (m) {
+          clearTimeout(t);
+          resolve(m[1]!);
+        }
+      });
+    });
+    c.ws = new WebSocket(wsUrl);
+    await new Promise((r, j) => {
+      c.ws.onopen = r;
+      c.ws.onerror = j;
+    });
+    c.ws.onmessage = (ev) => {
+      const msg = JSON.parse(String(ev.data));
+      const p = msg.id && c.pending.get(msg.id);
+      if (!p) return;
+      c.pending.delete(msg.id);
+      if (msg.error) p.reject(new Error(JSON.stringify(msg.error)));
+      else p.resolve(msg.result);
+    };
+    c.version = (await c.send('Browser.getVersion', {}, true)).product;
+    const { targetInfos } = await c.send('Target.getTargets', {}, true);
+    const page = targetInfos.find((t: any) => t.type === 'page');
+    c.sessionId = (
+      await c.send('Target.attachToTarget', { targetId: page.targetId, flatten: true }, true)
+    ).sessionId;
+    await c.send('Page.enable');
+    await c.send('Emulation.setDeviceMetricsOverride', {
+      width,
+      height,
+      deviceScaleFactor: opts.scale ?? 1,
+      mobile: false,
+    });
+    await c.send('Page.navigate', { url: `http://127.0.0.1:${port}/game.pdf` });
+    await c.settle();
+    return c;
+  }
+
+  send(method: string, params: object = {}, browser = false): Promise<any> {
+    const id = ++this.seq;
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve, reject });
+      this.ws.send(
+        JSON.stringify({
+          id,
+          method,
+          params,
+          ...(browser ? {} : { sessionId: this.sessionId }),
+        }),
+      );
+    });
+  }
+
+  async screenshot(): Promise<Image> {
+    const { data } = await this.send('Page.captureScreenshot', { format: 'png' });
+    return decodePng(Buffer.from(data, 'base64'));
+  }
+
+  // Waits until two screenshots in a row match.
+  async settle(timeout = 10000): Promise<Image> {
+    const end = Date.now() + timeout;
+    await sleep(1500);
+    let prev = await this.screenshot();
+    while (Date.now() < end) {
+      await sleep(250);
+      const next = await this.screenshot();
+      if (next.data.equals(prev.data)) return next;
+      prev = next;
+    }
+    return prev;
+  }
+
+  async click(x: number, y: number): Promise<void> {
+    // Move in first. PDFium sets up a widget's input when the mouse enters it.
+    for (const d of [6, 3, 0]) {
+      await this.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x - d, y });
+      await sleep(20);
+    }
+    await this.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x,
+      y,
+      button: 'left',
+      buttons: 1,
+      clickCount: 1,
+    });
+    await sleep(20);
+    await this.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      x,
+      y,
+      button: 'left',
+      clickCount: 1,
+    });
+  }
+
+  async key(key: string): Promise<void> {
+    const special: Record<string, [code: string, vk: number, text?: string]> = {
+      ArrowUp: ['ArrowUp', 38],
+      ArrowDown: ['ArrowDown', 40],
+      ArrowLeft: ['ArrowLeft', 37],
+      ArrowRight: ['ArrowRight', 39],
+      Enter: ['Enter', 13, '\r'],
+      Escape: ['Escape', 27, '\x1b'],
+      Tab: ['Tab', 9],
+      ' ': ['Space', 32, ' '],
+      // Escape and Backspace need their character, like a real keyboard sends. Without it,
+      // headless Chrome stalls on the next mouse event. A normal window doesn't.
+      Backspace: ['Backspace', 8, '\b'],
+    };
+    const [code, vk, text] = special[key] ?? [
+      /[a-z]/i.test(key) ? 'Key' + key.toUpperCase() : 'Digit' + key,
+      key.toUpperCase().charCodeAt(0),
+      key,
+    ];
+    const base = { key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk };
+    await this.send('Input.dispatchKeyEvent', {
+      type: text ? 'keyDown' : 'rawKeyDown',
+      ...base,
+      ...(text ? { text, unmodifiedText: text } : {}),
+    });
+    await this.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
+  }
+
+  async close(): Promise<void> {
+    // Chrome can drop the socket before it answers, so don't wait for the reply.
+    const exited = new Promise<void>((r) => this.proc.once('exit', () => r()));
+    this.send('Browser.close', {}, true).catch(() => undefined);
+    await Promise.race([exited, sleep(3000)]);
+    this.proc.kill('SIGKILL');
+    this.ws.close();
+    this.server.closeAllConnections();
+    this.server.close();
+    await sleep(200);
+    rmSync(this.profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
+}
