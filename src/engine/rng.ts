@@ -25,3 +25,17 @@ export function int(rng: Rng, max: number): number {
 export function chance(rng: Rng, percent: number): boolean {
   return int(rng, 100) < percent;
 }
+
+export function pick<T>(rng: Rng, list: T[]): T {
+  return list[int(rng, list.length)]!;
+}
+
+export function shuffle<T>(rng: Rng, list: T[]): T[] {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = int(rng, i + 1);
+    const tmp = list[i]!;
+    list[i] = list[j]!;
+    list[j] = tmp;
+  }
+  return list;
+}
