@@ -15,3 +15,19 @@ export const ENEMY_STATS: { [K in EnemyKind]: EnemyStats } = {
   skeleton: { name: 'SKELETON', hp: 6, attack: 3, score: 25, sight: 8 },
   warden: { name: 'WARDEN', hp: 18, attack: 5, score: 200, sight: 9 },
 };
+
+export const FLOOR_ENEMIES: EnemyKind[][] = [
+  ['slime', 'slime', 'bat'],
+  ['slime', 'slime', 'bat', 'bat', 'skeleton'],
+  ['slime', 'slime', 'bat', 'bat', 'skeleton', 'skeleton'],
+  ['slime', 'bat', 'bat', 'skeleton', 'skeleton', 'skeleton'],
+  ['slime', 'bat', 'bat', 'skeleton', 'skeleton', 'skeleton', 'warden'],
+];
+
+export const FLOOR_ITEMS: ItemKind[][] = [
+  ['coin', 'coin', 'coin', 'coin', 'potion'],
+  ['coin', 'coin', 'coin', 'gem', 'potion', 'sword'],
+  ['coin', 'coin', 'gem', 'potion', 'potion', 'shield'],
+  ['coin', 'coin', 'gem', 'gem', 'potion', 'sword'],
+  ['coin', 'gem', 'gem', 'potion', 'potion'],
+];
