@@ -31,3 +31,32 @@ export const FLOOR_ITEMS: ItemKind[][] = [
   ['coin', 'coin', 'gem', 'gem', 'potion', 'sword'],
   ['coin', 'gem', 'gem', 'potion', 'potion'],
 ];
+
+export const ITEM_NAMES: { [K in ItemKind]: string } = {
+  key: 'A BRASS KEY',
+  coin: 'A GOLD COIN',
+  gem: 'A RUBY',
+  potion: 'A POTION',
+  sword: 'A SHARPER SWORD',
+  shield: 'A STURDY SHIELD',
+  crown: 'THE ASHEN CROWN',
+};
+
+export const ITEM_SCORE: { [K in ItemKind]: number } = {
+  key: 5,
+  coin: 10,
+  gem: 50,
+  potion: 5,
+  sword: 25,
+  shield: 25,
+  crown: 500,
+};
+
+export const START_HP = 12;
+export const START_ATTACK = 2;
+export const POTION_HEAL = 6;
+export const DESCEND_HEAL = 3;
+export const DESCEND_SCORE = 100;
+export const CRIT_PERCENT = 12;
+export const ALERT_TURNS = 6;
+export const VIEW_RADIUS = 7;
