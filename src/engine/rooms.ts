@@ -79,3 +79,40 @@ export function divide(
     return;
   }
 }
+
+// Gives every floor cell a room number. Openings belong to no room (-1).
+export function labelRooms(
+  terrain: number[],
+  openings: Point[],
+): { label: number[]; rooms: Point[][] } {
+  const isOpening = filled(false);
+  for (const p of openings) isOpening[at(p.x, p.y)] = true;
+
+  const label = filled(-1);
+  const rooms: Point[][] = [];
+  const unvisited = (x: number, y: number) => {
+    const cell = at(x, y);
+    return terrain[cell] === T_FLOOR && !isOpening[cell] && label[cell] === -1;
+  };
+
+  for (let y = 0; y < HEIGHT; y++) {
+    for (let x = 0; x < WIDTH; x++) {
+      if (!unvisited(x, y)) continue;
+      const id = rooms.length;
+      const cells: Point[] = [{ x, y }];
+      label[at(x, y)] = id;
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i]!;
+        for (const dir of DIRECTIONS) {
+          const nx = cell.x + dir.x;
+          const ny = cell.y + dir.y;
+          if (!inBounds(nx, ny) || !unvisited(nx, ny)) continue;
+          label[at(nx, ny)] = id;
+          cells.push({ x: nx, y: ny });
+        }
+      }
+      rooms.push(cells);
+    }
+  }
+  return { label, rooms };
+}
