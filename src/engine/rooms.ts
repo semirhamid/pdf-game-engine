@@ -116,3 +116,47 @@ export function labelRooms(
   }
   return { label, rooms };
 }
+
+// The rooms on either side of a cell, if it sits in a straight wall between two of them.
+export function roomsBeside(label: number[], x: number, y: number): [number, number] | null {
+  const left = label[at(x - 1, y)]!;
+  const right = label[at(x + 1, y)]!;
+  const up = label[at(x, y - 1)]!;
+  const down = label[at(x, y + 1)]!;
+  if (left >= 0 && right >= 0 && up < 0 && down < 0) return [left, right];
+  if (up >= 0 && down >= 0 && left < 0 && right < 0) return [up, down];
+  return null;
+}
+
+export function otherSide(gap: Gap, room: number): number {
+  return gap.a === room ? gap.b : gap.a;
+}
+
+// Breadth-first walk over rooms. Rooms that can't be reached keep distance -1.
+export function walkRooms(
+  roomCount: number,
+  gaps: Gap[],
+  from: number,
+  closed: Gap[],
+): { dist: number[]; cameBy: (Gap | null)[] } {
+  const dist: number[] = [];
+  const cameBy: (Gap | null)[] = [];
+  for (let i = 0; i < roomCount; i++) {
+    dist.push(-1);
+    cameBy.push(null);
+  }
+  dist[from] = 0;
+  const queue = [from];
+  for (let i = 0; i < queue.length; i++) {
+    const room = queue[i]!;
+    for (const gap of gaps) {
+      if (closed.indexOf(gap) !== -1 || (gap.a !== room && gap.b !== room)) continue;
+      const other = otherSide(gap, room);
+      if (dist[other] !== -1) continue;
+      dist[other] = dist[room]! + 1;
+      cameBy[other] = gap;
+      queue.push(other);
+    }
+  }
+  return { dist, cameBy };
+}
