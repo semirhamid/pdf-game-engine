@@ -43,3 +43,12 @@ function pathTo(room: number, start: number, cameBy: (Gap | null)[]): Gap[] {
   }
   return path;
 }
+
+function chooseLocks(rng: Rng, path: Gap[], floor: number): Gap[] {
+  const count = Math.min(floor >= 3 ? 2 : 1, path.length);
+  const chosen = shuffle(
+    rng,
+    path.map((_, i) => i),
+  ).slice(0, count);
+  return chosen.sort((a, b) => a - b).map((i) => path[i]!);
+}
