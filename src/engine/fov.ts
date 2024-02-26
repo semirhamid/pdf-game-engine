@@ -44,3 +44,39 @@ export function lineOfSight(
   }
   return true;
 }
+
+export function updateVisibility(state: GameState): void {
+  const { terrain, player } = state;
+  const visible = filled(false);
+  const reach = VIEW_RADIUS * VIEW_RADIUS + 1; // the +1 rounds off the circle
+
+  for (let y = player.y - VIEW_RADIUS; y <= player.y + VIEW_RADIUS; y++) {
+    for (let x = player.x - VIEW_RADIUS; x <= player.x + VIEW_RADIUS; x++) {
+      if (!inBounds(x, y) || isOpaque(terrain[at(x, y)])) continue;
+      const dx = x - player.x;
+      const dy = y - player.y;
+      if (dx * dx + dy * dy > reach) continue;
+      if (lineOfSight(terrain, player.x, player.y, x, y)) visible[at(x, y)] = true;
+    }
+  }
+
+  // Rays miss wall corners, so light any wall that touches a visible floor cell instead.
+  const touchesVisibleFloor = (x: number, y: number) => {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!inBounds(x + dx, y + dy)) continue;
+        const cell = at(x + dx, y + dy);
+        if (visible[cell] && !isOpaque(terrain[cell])) return true;
+      }
+    }
+    return false;
+  };
+  for (let y = 0; y < HEIGHT; y++) {
+    for (let x = 0; x < WIDTH; x++) {
+      const cell = at(x, y);
+      if (isOpaque(terrain[cell]) && touchesVisibleFloor(x, y)) visible[cell] = true;
+      if (visible[cell]) state.explored[cell] = true;
+    }
+  }
+  state.visible = visible;
+}
