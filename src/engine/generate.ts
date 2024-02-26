@@ -96,3 +96,119 @@ function addPillars(rng: Rng, terrain: number[], rooms: Point[][]): void {
     if (clear) terrain[at(cell.x, cell.y)] = T_WALL;
   }
 }
+
+function attempt(rng: Rng, floor: number): Level | null {
+  const terrain = emptyMap();
+  const openings: Point[] = [];
+  divide(rng, terrain, 1, 1, WIDTH - 2, HEIGHT - 2, openings);
+
+  const { label, rooms } = labelRooms(terrain, openings);
+  const gaps: Gap[] = [];
+  for (const { x, y } of openings) {
+    const pair = roomsBeside(label, x, y);
+    if (!pair) return null;
+    gaps.push({ x, y, a: pair[0], b: pair[1] });
+  }
+
+  const roomIds = rooms.map((_, i) => i);
+  const startRoom = pick(rng, roomIds);
+  const walk = walkRooms(rooms.length, gaps, startRoom, []);
+  const goalRoom = roomIds.reduce(
+    (best, id) => (walk.dist[id]! > walk.dist[best]! ? id : best),
+    startRoom,
+  );
+  if (walk.dist[goalRoom]! < 2) return null;
+
+  const locks = chooseLocks(rng, pathTo(goalRoom, startRoom, walk.cameBy), floor);
+
+  // How many locks stand between the start and each room.
+  const locksBefore = roomIds.map(() => -1);
+  for (let opened = 0; opened <= locks.length; opened++) {
+    const { dist } = walkRooms(rooms.length, gaps, startRoom, locks.slice(opened));
+    for (const id of roomIds) {
+      if (locksBefore[id] === -1 && dist[id]! >= 0) locksBefore[id] = opened;
+    }
+  }
+
+  const doors: Point[] = [];
+  for (const gap of gaps) {
+    doors.push(gap);
+    const locked = locks.indexOf(gap) !== -1;
+    terrain[at(gap.x, gap.y)] = locked ? T_LOCKED : chance(rng, 60) ? T_DOOR : T_FLOOR;
+  }
+  addLoops(rng, terrain, label, locksBefore, doors);
+  addPillars(rng, terrain, rooms);
+
+  // Keep doorways and the cells next to them free.
+  const used: boolean[] = [];
+  for (const door of doors) {
+    used[at(door.x, door.y)] = true;
+    for (const dir of DIRECTIONS) used[at(door.x + dir.x, door.y + dir.y)] = true;
+  }
+
+  const place = (room: number, allowed?: (p: Point) => boolean): Point | null => {
+    const options = rooms[room]!.filter((p) => {
+      const cell = at(p.x, p.y);
+      return terrain[cell] === T_FLOOR && !used[cell] && (!allowed || allowed(p));
+    });
+    if (!options.length) return null;
+    const { x, y } = pick(rng, options);
+    used[at(x, y)] = true;
+    return { x, y };
+  };
+  const placeAnywhere = (allowed?: (p: Point) => boolean): Point | null => {
+    for (let i = 0; i < 24; i++) {
+      const p = place(pick(rng, roomIds), allowed);
+      if (p) return p;
+    }
+    return null;
+  };
+
+  const start = place(startRoom);
+  const goal = place(goalRoom);
+  if (!start || !goal) return null;
+
+  const items: Item[] = [];
+  for (let k = 0; k < locks.length; k++) {
+    // Prefer a room other than the one the player wakes up in.
+    const order = shuffle(
+      rng,
+      roomIds.filter((id) => locksBefore[id] === k),
+    ).sort((a, b) => Number(a === startRoom) - Number(b === startRoom));
+    let spot: Point | null = null;
+    for (const id of order) if (!spot) spot = place(id);
+    if (!spot) return null;
+    items.push({ kind: 'key', x: spot.x, y: spot.y });
+  }
+
+  if (floor === FLOORS) items.push({ kind: 'crown', x: goal.x, y: goal.y });
+  else terrain[at(goal.x, goal.y)] = T_STAIRS;
+
+  for (const kind of FLOOR_ITEMS[floor - 1]!) {
+    const p = placeAnywhere();
+    if (p) items.push({ kind, x: p.x, y: p.y });
+  }
+
+  const enemies: Enemy[] = [];
+  const farFromStart = (p: Point) => distance(p, start) >= SAFE_DISTANCE;
+  let id = 0;
+  for (const kind of FLOOR_ENEMIES[floor - 1]!) {
+    id++;
+    const boss = kind === 'warden';
+    const p = boss ? place(goalRoom, farFromStart) : placeAnywhere(farFromStart);
+    if (p) enemies.push({ id, kind, x: p.x, y: p.y, hp: ENEMY_STATS[kind].hp, alert: 0 });
+    else if (boss) return null;
+  }
+
+  return { terrain, start, goal, items, enemies };
+}
+
+// The same seed and floor always give the same level.
+export function generateLevel(seed: number, floor: number): Level {
+  const rng = makeRng((seed ^ (floor * 0x9e3779b1)) | 0);
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    const level = attempt(rng, floor);
+    if (level && isSolvable(level)) return level;
+  }
+  throw new Error('Level generation failed for seed ' + seed + ' floor ' + floor);
+}
