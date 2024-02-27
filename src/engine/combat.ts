@@ -18,3 +18,15 @@ export function playerAttack(state: GameState, enemy: Enemy): void {
   state.score += stats.score;
   state.events.push({ type: 'kill', id: enemy.id, amount: damage, what: stats.name });
 }
+
+export function enemyAttack(state: GameState, enemy: Enemy): void {
+  const { player } = state;
+  const stats = ENEMY_STATS[enemy.kind];
+  const damage = Math.max(1, stats.attack - player.defence);
+  player.hp = Math.max(0, player.hp - damage);
+  state.events.push({ type: 'hurt', id: enemy.id, amount: damage, what: stats.name });
+  if (player.hp === 0) {
+    state.status = 'dead';
+    state.events.push({ type: 'death', what: stats.name });
+  }
+}
