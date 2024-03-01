@@ -72,3 +72,33 @@ function chase(state: GameState, enemy: Enemy, dist: number[]): void {
   }
   if (best) tryMove(state, enemy, best);
 }
+
+function takeTurn(state: GameState, enemy: Enemy, dist: number[]): void {
+  const { player, terrain, rng, turn } = state;
+  const away = distance(enemy, player);
+  const seesPlayer =
+    away <= ENEMY_STATS[enemy.kind].sight &&
+    lineOfSight(terrain, enemy.x, enemy.y, player.x, player.y);
+  if (seesPlayer) enemy.alert = Math.max(enemy.alert, ALERT_TURNS);
+  else if (enemy.alert > 0) enemy.alert--;
+
+  if (enemy.kind === 'slime' && turn % 2 === 0) return;
+  // The warden hits hard, so it rests every third turn to give the player an opening.
+  if (enemy.kind === 'warden' && turn % 3 === 0) return;
+  if (enemy.kind === 'bat' && chance(rng, 50)) {
+    wander(state, enemy);
+    return;
+  }
+
+  if (away === 1) enemyAttack(state, enemy);
+  else if (enemy.alert > 0) chase(state, enemy, dist);
+  else if (chance(rng, 25)) wander(state, enemy);
+}
+
+export function enemyTurn(state: GameState): void {
+  const dist = distanceField(state);
+  for (const enemy of state.enemies) {
+    if (state.status !== 'playing') return;
+    takeTurn(state, enemy, dist);
+  }
+}
