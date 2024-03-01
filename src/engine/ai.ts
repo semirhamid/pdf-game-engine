@@ -43,3 +43,32 @@ export function distanceField(state: GameState): number[] {
   }
   return dist;
 }
+
+function isBlocked(state: GameState, x: number, y: number): boolean {
+  if (!inBounds(x, y) || !monsterCanWalk(state.terrain[at(x, y)])) return true;
+  if (state.player.x === x && state.player.y === y) return true;
+  return state.enemies.some((other) => other.x === x && other.y === y);
+}
+
+function tryMove(state: GameState, enemy: Enemy, dir: Point): void {
+  if (isBlocked(state, enemy.x + dir.x, enemy.y + dir.y)) return;
+  enemy.x += dir.x;
+  enemy.y += dir.y;
+}
+
+function wander(state: GameState, enemy: Enemy): void {
+  tryMove(state, enemy, pick(state.rng, DIRECTIONS));
+}
+
+function chase(state: GameState, enemy: Enemy, dist: number[]): void {
+  let shortest = dist[at(enemy.x, enemy.y)]!;
+  let best: Point | null = null;
+  for (const dir of DIRECTIONS) {
+    const x = enemy.x + dir.x;
+    const y = enemy.y + dir.y;
+    if (isBlocked(state, x, y) || dist[at(x, y)]! >= shortest) continue;
+    shortest = dist[at(x, y)]!;
+    best = dir;
+  }
+  if (best) tryMove(state, enemy, best);
+}
