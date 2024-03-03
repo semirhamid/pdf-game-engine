@@ -70,3 +70,42 @@ export function newGame(seed: number): GameState {
   enterFloor(state, 1);
   return state;
 }
+
+function findAt<T extends Point>(list: T[], x: number, y: number): T | null {
+  for (const thing of list) if (thing.x === x && thing.y === y) return thing;
+  return null;
+}
+
+export function enemyAt(state: GameState, x: number, y: number): Enemy | null {
+  return findAt(state.enemies, x, y);
+}
+
+export function itemAt(state: GameState, x: number, y: number): Item | null {
+  return findAt(state.items, x, y);
+}
+
+function pickUp(state: GameState, item: Item): void {
+  const { player } = state;
+  state.items.splice(state.items.indexOf(item), 1);
+  state.score += ITEM_SCORE[item.kind];
+  state.events.push({ type: 'pickup', what: ITEM_NAMES[item.kind] });
+  switch (item.kind) {
+    case 'key':
+      player.keys++;
+      break;
+    case 'potion':
+      player.potions++;
+      break;
+    case 'sword':
+      player.attack++;
+      break;
+    case 'shield':
+      player.defence++;
+      break;
+    case 'crown':
+      state.score += player.hp * 10;
+      state.status = 'won';
+      state.events.push({ type: 'win' });
+      break;
+  }
+}
