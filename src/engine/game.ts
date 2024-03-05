@@ -109,3 +109,44 @@ function pickUp(state: GameState, item: Item): void {
       break;
   }
 }
+
+// Returns whether it used up the turn. Walking into a wall doesn't.
+function movePlayer(state: GameState, dx: number, dy: number): boolean {
+  const { player, terrain, events } = state;
+  const x = player.x + dx;
+  const y = player.y + dy;
+  const cell = at(x, y);
+  const tile = inBounds(x, y) ? terrain[cell] : T_WALL;
+
+  if (tile === T_WALL) {
+    events.push({ type: 'bump' });
+    return false;
+  }
+  const enemy = enemyAt(state, x, y);
+  if (enemy) {
+    playerAttack(state, enemy);
+    return true;
+  }
+  if (tile === T_LOCKED) {
+    if (!player.keys) {
+      events.push({ type: 'locked' });
+      return false;
+    }
+    player.keys--;
+    terrain[cell] = T_DOOR_OPEN;
+    events.push({ type: 'unlock' });
+    return true;
+  }
+  if (tile === T_DOOR) {
+    terrain[cell] = T_DOOR_OPEN;
+    events.push({ type: 'open' });
+    return true;
+  }
+
+  player.x = x;
+  player.y = y;
+  const item = itemAt(state, x, y);
+  if (item) pickUp(state, item);
+  else events.push({ type: 'move' });
+  return true;
+}
