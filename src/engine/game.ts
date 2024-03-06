@@ -150,3 +150,50 @@ function movePlayer(state: GameState, dx: number, dy: number): boolean {
   else events.push({ type: 'move' });
   return true;
 }
+
+function drinkPotion(state: GameState): boolean {
+  const { player, events } = state;
+  if (!player.potions || player.hp === player.maxHp) {
+    events.push({ type: 'nopotion', amount: player.potions });
+    return false;
+  }
+  const before = player.hp;
+  player.potions--;
+  player.hp = Math.min(player.maxHp, player.hp + POTION_HEAL);
+  events.push({ type: 'heal', amount: player.hp - before });
+  return true;
+}
+
+function perform(state: GameState, action: Action): boolean {
+  switch (action) {
+    case 'up':
+      return movePlayer(state, 0, -1);
+    case 'down':
+      return movePlayer(state, 0, 1);
+    case 'left':
+      return movePlayer(state, -1, 0);
+    case 'right':
+      return movePlayer(state, 1, 0);
+    case 'potion':
+      return drinkPotion(state);
+    default:
+      return true; // waiting
+  }
+}
+
+export function step(state: GameState, action: Action): void {
+  state.events = [];
+  if (state.status !== 'playing' || !perform(state, action)) return;
+  state.turn++;
+
+  const { player } = state;
+  if (state.status === 'playing' && state.terrain[at(player.x, player.y)] === T_STAIRS) {
+    state.score += DESCEND_SCORE;
+    player.hp = Math.min(player.maxHp, player.hp + DESCEND_HEAL);
+    state.events.push({ type: 'descend', amount: state.floor + 1 });
+    enterFloor(state, state.floor + 1);
+    return;
+  }
+  if (state.status === 'playing') enemyTurn(state);
+  updateVisibility(state);
+}
