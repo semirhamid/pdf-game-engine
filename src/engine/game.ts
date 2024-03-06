@@ -197,3 +197,19 @@ export function step(state: GameState, action: Action): void {
   if (state.status === 'playing') enemyTurn(state);
   updateVisibility(state);
 }
+
+const REPLAY_KEYS: { [key: string]: Action } = {
+  w: 'up',
+  s: 'down',
+  a: 'left',
+  d: 'right',
+  '.': 'wait',
+  q: 'potion',
+};
+
+// Plays back a recorded run, e.g. replay(7, 'wwd.q').
+export function replay(seed: number, inputs: string): GameState {
+  const state = newGame(seed);
+  for (let i = 0; i < inputs.length; i++) step(state, REPLAY_KEYS[inputs.charAt(i)]!);
+  return state;
+}
