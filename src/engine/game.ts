@@ -213,3 +213,33 @@ export function replay(seed: number, inputs: string): GameState {
   for (let i = 0; i < inputs.length; i++) step(state, REPLAY_KEYS[inputs.charAt(i)]!);
   return state;
 }
+
+// A fingerprint of everything that can affect the rest of the run. Tests compare it between
+// Node and the PDF.
+export function hashState(state: GameState): number {
+  let hash = 17;
+  const add = (n: number) => {
+    hash = ((hash << 5) - hash + (n | 0)) | 0;
+  };
+  const addText = (text: string) => {
+    for (let i = 0; i < text.length; i++) add(text.charCodeAt(i));
+  };
+
+  const p = state.player;
+  [state.seed, state.rng.s, state.floor, state.turn, state.score, state.kills].forEach(add);
+  [p.x, p.y, p.hp, p.maxHp, p.attack, p.defence, p.keys, p.potions].forEach(add);
+  addText(state.status);
+  state.terrain.forEach((tile, i) => {
+    add(tile * 4 + (state.explored[i] ? 1 : 0) + (state.visible[i] ? 2 : 0));
+  });
+  for (const item of state.items) {
+    addText(item.kind);
+    add(item.x);
+    add(item.y);
+  }
+  for (const enemy of state.enemies) {
+    addText(enemy.kind);
+    [enemy.id, enemy.x, enemy.y, enemy.hp, enemy.alert].forEach(add);
+  }
+  return hash >>> 0;
+}
