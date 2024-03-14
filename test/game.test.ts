@@ -82,3 +82,60 @@ test('a locked door needs a key and consumes it', () => {
     [0, T_DOOR_OPEN, ['unlock']],
   );
 });
+
+test('every item has its effect', () => {
+  const pick = (kind: ItemKind): GameState => {
+    const s = arena();
+    put(s, kind, 6, 5);
+    step(s, 'right');
+    assert.equal(s.items.length, 0);
+    return s;
+  };
+  assert.equal(pick('key').player.keys, 1);
+  assert.equal(pick('potion').player.potions, 1);
+  assert.equal(pick('sword').player.attack, 3);
+  assert.equal(pick('shield').player.defence, 1);
+  assert.equal(pick('coin').score, 10);
+  assert.equal(pick('gem').score, 50);
+});
+
+test('potions heal, are consumed, never overheal, and are not wasted at full health', () => {
+  const s = arena();
+  s.player.potions = 2;
+  step(s, 'potion');
+  assert.deepEqual([s.player.potions, s.turn], [2, 0]);
+  s.player.hp = 1;
+  step(s, 'potion');
+  assert.deepEqual([s.player.hp, s.player.potions, s.turn], [1 + POTION_HEAL, 1, 1]);
+  s.player.hp = START_HP - 1;
+  step(s, 'potion');
+  assert.deepEqual([s.player.hp, s.player.potions], [START_HP, 0]);
+});
+
+test('attacking damages and kills, and a kill scores', () => {
+  const s = arena();
+  const e = spawn(s, 'bat', 6, 5);
+  s.player.attack = 1;
+  step(s, 'right');
+  assert.equal(s.player.x, 5, 'attacking does not move');
+  assert.ok(e.hp < 2);
+  s.player.attack = 9;
+  for (let i = 0; i < 20 && s.enemies.length; i++) {
+    s.player.x = e.x - 1;
+    s.player.y = e.y;
+    s.terrain[at(s.player.x, s.player.y)] = 1;
+    step(s, 'right');
+  }
+  assert.deepEqual([s.enemies.length, s.kills, s.score], [0, 1, 15]);
+});
+
+test('defence reduces damage to a minimum of one', () => {
+  const hit = (def: number): number => {
+    const s = arena();
+    spawn(s, 'skeleton', 6, 5, 5);
+    s.player.defence = def;
+    step(s, 'wait');
+    return START_HP - s.player.hp;
+  };
+  assert.deepEqual([hit(0), hit(1), hit(50)], [3, 2, 1]);
+});
