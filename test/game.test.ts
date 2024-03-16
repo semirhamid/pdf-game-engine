@@ -139,3 +139,51 @@ test('defence reduces damage to a minimum of one', () => {
   };
   assert.deepEqual([hit(0), hit(1), hit(50)], [3, 2, 1]);
 });
+
+test('death: health clamps at zero and the run freezes', () => {
+  const s = arena();
+  spawn(s, 'skeleton', 6, 5, 5);
+  s.player.hp = 1;
+  step(s, 'wait');
+  assert.deepEqual([s.player.hp, s.status], [0, 'dead']);
+  assert.ok(types(s).includes('death'));
+  const frozen = JSON.stringify({ ...s, events: [] });
+  step(s, 'left');
+  assert.equal(JSON.stringify({ ...s, events: [] }), frozen);
+});
+
+test('stairs lead down, heal a little, and reset keys', () => {
+  const s = arena();
+  s.terrain[at(6, 5)] = T_STAIRS;
+  s.player.hp = 4;
+  s.player.keys = 1;
+  step(s, 'right');
+  assert.deepEqual(
+    [s.floor, s.player.hp, s.player.keys, s.score],
+    [2, 4 + DESCEND_HEAL, 0, 100],
+  );
+  assert.ok(s.explored.some(Boolean) && !s.explored.every(Boolean));
+});
+
+test('taking the crown wins and converts health into score', () => {
+  const s = arena();
+  s.floor = FLOORS;
+  put(s, 'crown', 6, 5);
+  step(s, 'right');
+  assert.deepEqual([s.status, s.score], ['won', 500 + START_HP * 10]);
+});
+
+test('fog of war: walls hide what is behind them, memory persists', () => {
+  const s = arena();
+  for (let y = 0; y < HEIGHT; y++) s.terrain[at(8, y)] = T_WALL;
+  s.explored.fill(false);
+  step(s, 'wait');
+  assert.equal(s.visible[at(7, 5)], true);
+  assert.equal(s.visible[at(8, 5)], true, 'the wall face itself is seen');
+  assert.equal(s.visible[at(10, 5)], false);
+  s.player.x = 1;
+  s.player.y = 13;
+  step(s, 'wait');
+  assert.equal(s.visible[at(7, 5)], false);
+  assert.equal(s.explored[at(7, 5)], true);
+});
