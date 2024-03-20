@@ -71,3 +71,40 @@ export interface Run {
   y: number; // from the baseline
   length: number;
 }
+
+// Horizontal strokes of a letter. Unknown characters have none.
+export function inkRuns(ch: string): Run[] {
+  const runs: Run[] = [];
+  (PIXEL_FONT[ch] ?? []).forEach((mask, row) => {
+    for (let x = 0; x < GLYPH_W; x++) {
+      const inked = (column: number) => column < GLYPH_W && (mask & (16 >> column)) !== 0;
+      if (!inked(x)) continue;
+      let length = 1;
+      while (inked(x + length)) length++;
+      runs.push({ x, y: GLYPH_H - 1 - row, length });
+      x += length;
+    }
+  });
+  return runs;
+}
+
+// Text as PDF rectangles, for art that never changes. (x, y) is the left end of the baseline.
+export function textRects(text: string, x: number, y: number, pixel: number): string {
+  const round = (n: number) => +n.toFixed(3);
+  let out = '';
+  text
+    .toUpperCase()
+    .split('')
+    .forEach((ch, i) => {
+      for (const run of inkRuns(ch)) {
+        const left = round(x + (i * ADVANCE + run.x) * pixel);
+        const bottom = round(y + run.y * pixel);
+        out += `${left} ${bottom} ${round(run.length * pixel)} ${pixel} re `;
+      }
+    });
+  return out ? out + 'f\n' : '';
+}
+
+export function textWidth(text: string, pixel: number): number {
+  return (text.length * ADVANCE - 1) * pixel;
+}
