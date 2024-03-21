@@ -50,3 +50,62 @@ function rectangles(grid: Grid, hex: number, size: number): string {
   }
   return out;
 }
+
+// PDFium needs this to find Type 3 glyphs at all. Without it every character silently falls
+// back to Helvetica.
+function toUnicode(doc: PdfDocument, fontName: string): Ref {
+  return doc.stream(`/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def
+/CMapName /${fontName} def
+/CMapType 2 def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+1 beginbfrange
+<20> <7E> <0020>
+endbfrange
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+`);
+}
+
+function type3(
+  doc: PdfDocument,
+  fontName: string,
+  width: number,
+  height: number,
+  glyphs: Glyph[],
+  bottom = 0,
+): Ref {
+  const procs: Dict = {};
+  const differences: PdfValue[] = [];
+  const sorted = [...glyphs].sort((a, b) => a.ch.charCodeAt(0) - b.ch.charCodeAt(0));
+  for (const { ch, ops } of sorted) {
+    const id = glyphName(ch);
+    if (procs[id]) throw new Error(`Duplicate glyph ${JSON.stringify(ch)} in ${fontName}`);
+    procs[id] = doc.stream(ops, {}, true);
+    differences.push(ch.charCodeAt(0), name(id));
+  }
+  return doc.add({
+    Type: name('Font'),
+    Subtype: name('Type3'),
+    Name: name(fontName),
+    FontBBox: [0, bottom, width, height + bottom],
+    FontMatrix: [1 / height, 0, 0, 1 / height, 0, 0],
+    CharProcs: procs,
+    Encoding: { Type: name('Encoding'), Differences: differences },
+    FirstChar: 32,
+    LastChar: 126,
+    Widths: Array.from({ length: 95 }, () => width),
+    Resources: {},
+    ToUnicode: toUnicode(doc, fontName),
+  });
+}
+
+const colored = (grid: Grid) => `16 0 d0\n${gridToOps(grid)}`;
+const dimmed = (grid: Grid) =>
+  grid.map((row) => row.map((pixel) => (pixel === null ? null : dim(pixel))));
