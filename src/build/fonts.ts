@@ -155,3 +155,16 @@ export function actorFont(doc: PdfDocument): Ref {
   glyphs.push({ ch: ACTOR.bitOn, ops: '16 0 d0 1 g 0 0 16 16 re f\n' });
   return type3(doc, 'Actor', 16, 16, glyphs);
 }
+
+// Text glyphs use d1 instead of d0, which leaves the colour to the field.
+export function textFont(doc: PdfDocument): Ref {
+  const start = `${ADVANCE} 0 0 0 ${GLYPH_W} ${GLYPH_H} d1\n`;
+  const glyphs: Glyph[] = [{ ch: ' ', ops: start }];
+  for (const ch of Object.keys(PIXEL_FONT)) {
+    const rects = inkRuns(ch).map(({ x, y, length }) => `${x} ${y} ${length} 1 re\n`);
+    const ops = `${start}${rects.join('')}f\n`;
+    glyphs.push({ ch, ops });
+    if (/[A-Z]/.test(ch)) glyphs.push({ ch: ch.toLowerCase(), ops });
+  }
+  return type3(doc, 'Pixel', ADVANCE, GLYPH_H + 2, glyphs, -1);
+}
