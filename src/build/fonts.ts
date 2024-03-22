@@ -109,3 +109,49 @@ function type3(
 const colored = (grid: Grid) => `16 0 d0\n${gridToOps(grid)}`;
 const dimmed = (grid: Grid) =>
   grid.map((row) => row.map((pixel) => (pixel === null ? null : dim(pixel))));
+
+export function tileFont(doc: PdfDocument): Ref {
+  const glyphs: Glyph[] = [];
+  for (const key of Object.keys(TILE) as (keyof typeof TILE)[]) {
+    const grid = TERRAIN[key];
+    if (!grid) throw new Error(`No terrain art for ${key}`);
+    glyphs.push({ ch: TILE[key], ops: colored(grid) });
+    if (TILE_DIM[key] !== TILE[key]) {
+      glyphs.push({ ch: TILE_DIM[key], ops: colored(dimmed(grid)) });
+    }
+  }
+  return type3(doc, 'Tile', 16, 16, glyphs);
+}
+
+const PLAIN_ACTORS = [
+  'hero',
+  'slime',
+  'bat',
+  'skeleton',
+  'warden',
+  'key',
+  'coin',
+  'gem',
+  'potion',
+  'sword',
+  'shield',
+  'crown',
+  'heart',
+  'heartHalf',
+  'heartEmpty',
+] as const;
+const CAN_BE_HURT = ['hero', 'slime', 'bat', 'skeleton', 'warden'] as const;
+
+export function actorFont(doc: PdfDocument): Ref {
+  const glyphs: Glyph[] = [{ ch: ACTOR.none, ops: '16 0 d0\n' }];
+  for (const key of PLAIN_ACTORS) {
+    glyphs.push({ ch: ACTOR[key], ops: colored(SPRITES[key]!) });
+  }
+  for (const key of CAN_BE_HURT) {
+    const flash = key === 'hero' ? 0xd8394f : 0xfff4e0;
+    glyphs.push({ ch: ACTOR[`${key}Hurt`], ops: colored(silhouette(SPRITES[key]!, flash)) });
+  }
+  glyphs.push({ ch: ACTOR.bitOff, ops: '16 0 d0 0 g 0 0 16 16 re f\n' });
+  glyphs.push({ ch: ACTOR.bitOn, ops: '16 0 d0 1 g 0 0 16 16 re f\n' });
+  return type3(doc, 'Actor', 16, 16, glyphs);
+}
