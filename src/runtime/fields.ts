@@ -29,3 +29,23 @@ export const F = {
   result1: 'result1',
   result2: 'result2',
 } as const;
+
+export const MESSAGE_LINES = 3;
+
+// The keyboard is a list box (see main.ts). Left and Right jump to the first and last option,
+// Up and Down step off KEY_REST, and letters jump to the option they name.
+export const KEY_OPTIONS = ['<', ...'wasdqhnrp .'.split(''), '^', '=', '_', '>'];
+export const KEY_REST = KEY_OPTIONS.indexOf('=');
+
+export type Intent =
+  | 'up'
+  | 'down'
+  | 'left'
+  | 'right'
+  | 'wait'
+  | 'potion'
+  | 'help'
+  | 'new'
+  | 'retry'
+  | 'debug'
+  | 'confirm';
