@@ -118,3 +118,52 @@ export function asciiRow(state: GameState, actors: string[], y: number): string 
   }
   return row;
 }
+
+export function hearts(hp: number, maxHp: number): string {
+  let out = '';
+  for (let i = 0; i < maxHp; i += 2) {
+    if (hp >= i + 2) out += ACTOR.heart;
+    else out += hp === i + 1 ? ACTOR.heartHalf : ACTOR.heartEmpty;
+  }
+  return out;
+}
+
+function bits(value: number, count: number): string {
+  let out = '';
+  for (let i = count - 1; i >= 0; i--) out += (value >>> i) & 1 ? ACTOR.bitOn : ACTOR.bitOff;
+  return out;
+}
+
+// Black and white squares the browser tests read from a screenshot: a 1010 marker, the state
+// hash and the low byte of the turn counter.
+export function telemetryBits(state: GameState): string {
+  return bits(10, 4) + bits(hashState(state), 32) + bits(state.turn, 8);
+}
+
+export function describe(event: GameEvent): string {
+  const { amount, what } = event;
+  switch (event.type) {
+    case 'open':
+      return 'THE DOOR CREAKS OPEN.';
+    case 'unlock':
+      return 'YOU TURN THE KEY. THE LOCK GIVES WAY.';
+    case 'locked':
+      return 'LOCKED. A KEY MUST BE SOMEWHERE CLOSE.';
+    case 'pickup':
+      return `YOU FIND ${what}.`;
+    case 'hit':
+      return `YOU HIT THE ${what} FOR ${amount}.`;
+    case 'kill':
+      return `YOU SLAY THE ${what}!`;
+    case 'hurt':
+      return `THE ${what} HITS YOU FOR ${amount}.`;
+    case 'heal':
+      return `THE POTION RESTORES ${amount} HEALTH.`;
+    case 'nopotion':
+      return amount ? 'YOU ARE ALREADY AT FULL HEALTH.' : 'YOU HAVE NO POTIONS.';
+    case 'descend':
+      return `YOU DESCEND TO FLOOR ${amount}.`;
+    default:
+      return '';
+  }
+}
