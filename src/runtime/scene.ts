@@ -167,3 +167,58 @@ export function describe(event: GameEvent): string {
       return '';
   }
 }
+
+function addBoard(values: Frame['values'], state: GameState | null, ui: Ui): void {
+  const actors = state ? actorCells(state, ui.mode === 'tiles' ? ui.flash : []) : [];
+  for (let y = 0; y < HEIGHT; y++) {
+    const tiles = state && ui.mode === 'tiles';
+    const ascii = state && ui.mode === 'ascii';
+    values[F.terrain + y] = tiles ? terrainRow(state, y) : '';
+    values[F.actor + y] = tiles ? rowOf(actors, y) : '';
+    values[F.ascii + y] = ascii ? asciiRow(state, actors, y) : '';
+  }
+}
+
+function addStats(values: Frame['values'], state: GameState, mode: Mode): void {
+  const p = state.player;
+  values[F.hearts] = mode === 'tiles' ? hearts(p.hp, p.maxHp) : '';
+  values[F.hpText] = `${p.hp}/${p.maxHp}`;
+  values[F.attack] = `ATK ${p.attack}`;
+  values[F.defence] = `DEF ${p.defence}`;
+  values[F.keys] = `x ${p.keys}`;
+  values[F.potions] = `x ${p.potions}`;
+  values[F.floor] = `FLOOR ${state.floor}/${FLOORS} ${FLOOR_NAMES[state.floor - 1]}`;
+  values[F.score] = `SCORE ${state.score}`;
+  values[F.seed] = `SEED ${state.seed}`;
+}
+
+export function buildFrame(state: GameState | null, ui: Ui): Frame {
+  const values: Frame['values'] = {};
+  const gameOver = ui.screen === 'dead' || ui.screen === 'won';
+
+  addBoard(values, state, ui);
+  if (state) addStats(values, state, ui.mode);
+  if (ui.screen === 'title') values[F.seed] = 'SEED (OPTIONAL)';
+  values[F.best] = `BEST ${ui.best}`;
+  for (let i = 0; i < MESSAGE_LINES; i++) {
+    values[F.message + i] = ui.messages[ui.messages.length - 1 - i] || '';
+  }
+  values[F.kbStatus] = ui.keyboardFocused ? 'KEYBOARD READY' : 'CLICK MAP FOR KEYBOARD';
+
+  values[F.result1] = '';
+  values[F.result2] = '';
+  if (state && gameOver) {
+    values[F.result1] = `SCORE ${state.score}   FLOOR ${state.floor}   SLAIN ${state.kills}`;
+    values[F.result2] = `SEED ${state.seed}   ${state.turn} TURNS`;
+  }
+  values[F.debug] = ui.debug || '';
+  values[F.bits] = state && ui.debug !== null ? telemetryBits(state) : '';
+
+  const visible: Frame['visible'] = {};
+  visible[F.title] = visible[F.seedInput] = ui.screen === 'title';
+  visible[F.help] = ui.screen === 'help';
+  visible[F.dead] = ui.screen === 'dead';
+  visible[F.won] = ui.screen === 'won';
+  visible[F.result1] = visible[F.result2] = gameOver;
+  return { values, visible };
+}
