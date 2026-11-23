@@ -1,12 +1,14 @@
-# PDF Dungeon
+# PDF Dungeon: a roguelike that runs inside a PDF
 
-I built a playable dungeon-crawler game engine that executes inside a PDF document.
+I built a playable dungeon-crawler game engine that executes inside a PDF document. Open one 97 KB
+file in Chrome and you get five floors of generated dungeon, with monsters, locked doors, loot, fog
+of war and a boss at the bottom.
 
 ![A run in Chrome's PDF viewer](docs/media/demo.gif)
 
-The whole game is one 97 KB file, [`dist/game.pdf`](dist/game.pdf). No web page around it, nothing
-to install, no network. The game code is JavaScript inside the PDF, the screen is made of form
-fields, and the sprites are letters in a font I generate from pixel art.
+There's no web page around it, nothing to install and no network. The game code is JavaScript stored
+in [`dist/game.pdf`](dist/game.pdf), the screen is made of form fields, and the sprites are
+characters in a font generated from pixel art.
 
 ## Playing it
 

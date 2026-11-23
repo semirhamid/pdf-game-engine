@@ -1,7 +1,7 @@
 {
   "name": "pdf-dungeon",
   "version": "1.0.0",
-  "description": "A dungeon crawler that runs inside a PDF.",
+  "description": "A turn-based roguelike and game engine that run inside a single PDF file.",
   "license": "MIT",
   "private": true,
   "type": "module",
